@@ -1,0 +1,6 @@
+
+
+
+class SQLiteDataManager:
+    pass
+
