@@ -8,7 +8,7 @@ def create_tables():
     cursor = conn.cursor()
     cursor.execute("PRAGMA foreign_keys = ON;")
 
-    # Users Table
+    # Users Table (remains the same)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS Users (
         user_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,7 +19,7 @@ def create_tables():
     )
     ''')
 
-    # Countries Table
+    # Countries Table (remains the same)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS Countries (
         country_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,10 +38,11 @@ def create_tables():
         location_id INTEGER PRIMARY KEY AUTOINCREMENT,
         loc_name TEXT NOT NULL,
         user_id INTEGER NOT NULL,
-        country_id INTEGER NOT NULL,
+        country_id INTEGER NOT NULL, -- Country still relevant for the location itself
         image_url TEXT,
         FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
-        FOREIGN KEY (country_id) REFERENCES Countries(country_id) ON DELETE CASCADE
+        FOREIGN KEY (country_id) REFERENCES Countries(country_id) ON DELETE CASCADE,
+        UNIQUE (user_id, loc_name) -- Ensures a user cannot have two locations with the same name
     )
     ''')
 
@@ -51,15 +52,16 @@ def create_tables():
         trip_id INTEGER PRIMARY KEY AUTOINCREMENT,
         trip_name TEXT NOT NULL,
         user_id INTEGER NOT NULL,
-        country_id INTEGER NOT NULL,
+        country_id INTEGER NOT NULL, -- Country still relevant for the trip itself
         startdate TEXT,
         enddate TEXT,
         FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
-        FOREIGN KEY (country_id) REFERENCES Countries(country_id) ON DELETE CASCADE
+        FOREIGN KEY (country_id) REFERENCES Countries(country_id) ON DELETE CASCADE,
+        UNIQUE (user_id, trip_name) -- Ensures a user cannot have two trips with the same name
     )
     ''')
 
-    # User_countries Table (Linking Table for Many-to-Many between Users and Countries)
+    # User_countries Table (remains the same)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS User_countries (
         user_id INTEGER NOT NULL,
@@ -72,18 +74,7 @@ def create_tables():
 
     conn.commit()
     conn.close()
-    print(f"✅ Full database schema initialized in {DATABASE_NAME}.")
+    print(f"✅ Full database schema initialized in {DATABASE_NAME} with updated UNIQUE constraints.")
 
 if __name__ == '__main__':
     create_tables()
-    # Optional: Add a default user if needed for immediate testing
-    # conn = sqlite3.connect(DATABASE_NAME)
-    # cursor = conn.cursor()
-    # try:
-    #     cursor.execute("INSERT OR IGNORE INTO Users (user_id, username, email) VALUES (?, ?, ?)", (1, 'sampleuser', 'sample@example.com'))
-    #     conn.commit()
-    #     print("Sample user ensured.")
-    # except sqlite3.Error as e:
-    #     print(f"Error with sample user: {e}")
-    # finally:
-    #     if conn: conn.close()

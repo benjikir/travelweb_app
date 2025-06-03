@@ -15,11 +15,12 @@ api = Api(app,
           )
 
 # Add endpoints
+api.add_namespace(user_ns, path='/Users')
+api.add_namespace(user_country_ns, path='/User-countries-')
 api.add_namespace(country_ns, path='/Countries')
 api.add_namespace(location_ns, path='/Locations')
 api.add_namespace(trip_ns, path='/Trips')
-api.add_namespace(user_country_ns, path='/User-countries-')
-api.add_namespace(user_ns, path='/Users')
+
 
 if __name__ == '__main__':
     if not os.path.exists(DATABASE_NAME):
