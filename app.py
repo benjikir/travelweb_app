@@ -1,7 +1,7 @@
 # app.py
 from flask import Flask
 from flask_restx import Api
-from resources import country_ns, location_ns, trip_ns, admin_user_country_ns
+from resources import user_ns, country_ns, location_ns, trip_ns, user_country_ns
 from init_db import create_tables, DATABASE_NAME
 import os
 
@@ -14,11 +14,12 @@ api = Api(app,
           description="Showing my API Endpoints with Swagger UI",
           )
 
-# Add namespaces
+# Add endpoints
 api.add_namespace(country_ns, path='/Countries')
 api.add_namespace(location_ns, path='/Locations')
 api.add_namespace(trip_ns, path='/Trips')
-api.add_namespace(admin_user_country_ns, path='/Admin_user-countries-')
+api.add_namespace(user_country_ns, path='/User-countries-')
+api.add_namespace(user_ns, path='/Users')
 
 if __name__ == '__main__':
     if not os.path.exists(DATABASE_NAME):
@@ -34,4 +35,4 @@ if __name__ == '__main__':
         # finally:
         #     if conn: conn.close()
 
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

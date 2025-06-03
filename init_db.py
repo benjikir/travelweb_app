@@ -1,27 +1,12 @@
 # init_db.py
 import sqlite3
 
-DATABASE_NAME = 'travel_webapp.sqlite' # CHANGED
+DATABASE_NAME = 'travel_webapp.sqlite'
 
 def create_tables():
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
-
-    # Enable Foreign Keys enforcement for this connection
     cursor.execute("PRAGMA foreign_keys = ON;")
-
-    # Countries Table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS Countries (
-        country_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        country_code3 TEXT NOT NULL UNIQUE, -- Assuming code3 should be unique
-        country TEXT NOT NULL UNIQUE,       -- Assuming country name should be unique
-        flag_url TEXT,
-        currency TEXT,
-        continent TEXT,
-        capital TEXT
-    )
-    ''')
 
     # Users Table
     cursor.execute('''
@@ -30,7 +15,33 @@ def create_tables():
         username TEXT NOT NULL UNIQUE,
         email TEXT NOT NULL UNIQUE,
         profile_url TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP -- Auto set creation time
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # Countries Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS Countries (
+        country_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        country_code3 TEXT NOT NULL UNIQUE,
+        country TEXT NOT NULL UNIQUE,
+        flag_url TEXT,
+        currency TEXT,
+        continent TEXT,
+        capital TEXT
+    )
+    ''')
+
+    # Locations Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS Locations (
+        location_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        loc_name TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        country_id INTEGER NOT NULL,
+        image_url TEXT,
+        FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+        FOREIGN KEY (country_id) REFERENCES Countries(country_id) ON DELETE CASCADE
     )
     ''')
 
@@ -48,8 +59,7 @@ def create_tables():
     )
     ''')
 
-    # User_countries Table (Linking Table for Many-to-Many)
-    # Corrected PRIMARY KEY and added FOREIGN KEYS
+    # User_countries Table (Linking Table for Many-to-Many between Users and Countries)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS User_countries (
         user_id INTEGER NOT NULL,
@@ -60,35 +70,20 @@ def create_tables():
     )
     ''')
 
-    # Locations Table
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS Locations (
-        location_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        loc_name TEXT NOT NULL,
-        user_id INTEGER NOT NULL,
-        country_id INTEGER NOT NULL,
-        image_url TEXT,
-        FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
-        FOREIGN KEY (country_id) REFERENCES Countries(country_id) ON DELETE CASCADE
-    )
-    ''')
-
     conn.commit()
     conn.close()
-    print(f"✅ Database schema initialized in {DATABASE_NAME}.")
+    print(f"✅ Full database schema initialized in {DATABASE_NAME}.")
 
 if __name__ == '__main__':
     create_tables()
-    # You can add some sample data insertion here if needed for testing
-    # For example:
+    # Optional: Add a default user if needed for immediate testing
     # conn = sqlite3.connect(DATABASE_NAME)
     # cursor = conn.cursor()
     # try:
-    #     cursor.execute("INSERT INTO Users (username, email) VALUES (?, ?)", ('testuser', 'test@example.com'))
-    #     cursor.execute("INSERT INTO Countries (country_code3, country) VALUES (?, ?)", ('USA', 'United States'))
+    #     cursor.execute("INSERT OR IGNORE INTO Users (user_id, username, email) VALUES (?, ?, ?)", (1, 'sampleuser', 'sample@example.com'))
     #     conn.commit()
-    #     print("Sample data inserted.")
-    # except sqlite3.IntegrityError:
-    #     print("Sample data might already exist.")
+    #     print("Sample user ensured.")
+    # except sqlite3.Error as e:
+    #     print(f"Error with sample user: {e}")
     # finally:
-    #     conn.close()
+    #     if conn: conn.close()
