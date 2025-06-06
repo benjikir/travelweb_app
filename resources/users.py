@@ -1,18 +1,18 @@
 # resources/users.py
 from flask_restx import Namespace, Resource, fields
-from db import get_db
+from db import get_db  # Assuming db.py is in the parent directory or project root
 import sqlite3
 
-# Import country model if you plan to implement the nested /users/{id}/countries route
-# from .countries import country_model_output # Assuming country_model_output is defined in countries.py
+user_ns = Namespace('Users', description='User administration ')
 
-user_ns = Namespace('Users', description='User administration')
-
+# --- Main User Models ---
 user_model_input = user_ns.model('UserInput', {
-    'username': fields.String(required=True, description='The username', example='john_doe'),
-    'email': fields.String(required=True, description='The user email address', example='john.doe@example.com'),
+    'username': fields.String(required=True, description='The username', example='john_doe', min_length=3,
+                              max_length=50),
+    'email': fields.String(required=True, description='The user email address', example='john.doe@example.com',
+                           pattern="[^@]+@[^@]+\.[^@]+"),
     'profile_url': fields.String(description='URL to the user profile picture (optional)',
-                                 example='http://example.com/profile.jpg')
+                                 example='http://example.com/profile.jpg', max_length=2048)
 })
 
 user_model_output = user_ns.model('UserOutput', {
@@ -23,13 +23,23 @@ user_model_output = user_ns.model('UserOutput', {
     'created_at': fields.String(readonly=True, description='Timestamp of user creation')
 })
 
+# --- Model for countries associated with a user (used by the nested route) ---
+# This model is defined locally as country_ns is removed.
+associated_country_model = user_ns.model('AssociatedCountryInfo', {  # New unique model name
+    'country_id': fields.Integer(readonly=True, description='The unique identifier of the country'),
+    'country_code3': fields.String(description='The 3-letter ISO code of the country'),
+    'country': fields.String(description='The name of the country')
+    # Add any other essential country fields you want to display here
+    # e.g., 'flag_url': fields.String(description='URL of the country flag')
+})
+
 
 @user_ns.route('/')
 class UserList(Resource):
     @user_ns.doc('list_users')
     @user_ns.marshal_list_with(user_model_output)
     def get(self):
-        """List all users"""
+        """List all users, ordered by username."""
         with get_db() as conn:
             users = conn.execute(
                 'SELECT user_id, username, email, profile_url, created_at FROM Users ORDER BY username ASC').fetchall()
@@ -39,13 +49,13 @@ class UserList(Resource):
     @user_ns.expect(user_model_input)
     @user_ns.marshal_with(user_model_output, code=201)
     def post(self):
-        """Create a new user"""
+        """Create a new user."""
         data = user_ns.payload
         username = data.get('username', '').strip()
         email = data.get('email', '').strip()
         profile_url = data.get('profile_url', '').strip() if data.get('profile_url') is not None else None
 
-        if not username or not email:
+        if not username or not email:  # Basic validation
             user_ns.abort(400, "Username and email are required.")
 
         with get_db() as conn:
@@ -58,11 +68,13 @@ class UserList(Resource):
                 user_id = cursor.lastrowid
                 conn.commit()
             except sqlite3.IntegrityError as e:
-                user_ns.abort(409, f"Could not create user. Username or email might already exist. Error: {e}")
+                # This catches UNIQUE constraint violations for username or email
+                user_ns.abort(409,
+                              f"Could not create user. Username ('{username}') or email ('{email}') might already exist. Error: {e}")
 
-        with get_db() as conn:
+        with get_db() as conn:  # Fetch the created user to return it
             new_user = conn.execute('SELECT * FROM Users WHERE user_id = ?', (user_id,)).fetchone()
-        if not new_user:
+        if not new_user:  # Should ideally not happen if insert was successful
             user_ns.abort(500, "Internal Server Error: Failed to retrieve user after creation.")
         return dict(new_user), 201
 
@@ -74,7 +86,7 @@ class UserResource(Resource):
     @user_ns.doc('get_user')
     @user_ns.marshal_with(user_model_output)
     def get(self, id):
-        """Fetch a user given their identifier"""
+        """Fetch a user given their identifier."""
         with get_db() as conn:
             user = conn.execute('SELECT * FROM Users WHERE user_id = ?', (id,)).fetchone()
         if user is None:
@@ -85,17 +97,17 @@ class UserResource(Resource):
     @user_ns.expect(user_model_input)
     @user_ns.marshal_with(user_model_output)
     def put(self, id):
-        """Update a user given their identifier"""
+        """Update a user given their identifier."""
         data = user_ns.payload
         username = data.get('username', '').strip()
         email = data.get('email', '').strip()
         profile_url = data.get('profile_url', '').strip() if data.get('profile_url') is not None else None
 
-        if not username or not email:
+        if not username or not email:  # Basic validation
             user_ns.abort(400, "Username and email are required for update.")
 
         with get_db() as conn:
-            # Check if user exists
+            # Check if user exists before attempting update
             existing_user = conn.execute('SELECT user_id FROM Users WHERE user_id = ?', (id,)).fetchone()
             if not existing_user:
                 user_ns.abort(404, f"User with ID {id} not found, cannot update.")
@@ -107,48 +119,49 @@ class UserResource(Resource):
                 conn.commit()
             except sqlite3.IntegrityError as e:
                 user_ns.abort(409,
-                              f"Could not update user. Username or email might conflict with another user. Error: {e}")
+                              f"Could not update user. Username ('{username}') or email ('{email}') might conflict with another user. Error: {e}")
 
             updated_user = conn.execute('SELECT * FROM Users WHERE user_id = ?', (id,)).fetchone()
-        if not updated_user:  # Should not happen if the initial check passed
+        if not updated_user:  # Should not happen if the initial check passed and no race condition
             user_ns.abort(404, f"User with ID {id} could not be retrieved after update attempt.")
         return dict(updated_user)
 
     @user_ns.doc('delete_user')
     @user_ns.response(204, 'User deleted successfully')
     def delete(self, id):
-        """Delete a user by their identifier. Related data (trips, locations, user_countries) will also be deleted due to CASCADE."""
+        """Delete a user by their identifier. Related data in other tables will be affected due to CASCADE rules."""
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute('DELETE FROM Users WHERE user_id = ?', (id,))
             conn.commit()
-            if cursor.rowcount == 0:
+            if cursor.rowcount == 0:  # No rows were deleted
                 user_ns.abort(404, f"User with ID {id} not found, cannot delete.")
         return '', 204
 
 
 # --- Nested route for /users/{id}/countries ---
-# You'll need to import country_model_output from .countries
-from .countries import country_model_output  # Make sure this path is correct and model exists
-
-
-@user_ns.route('/<int:id>/countries')
-@user_ns.param('id', 'The user identifier')
+@user_ns.route('/<int:user_id>/countries')  # Renamed path param to user_id for clarity
+@user_ns.param('user_id', 'The identifier of the User')
 @user_ns.response(404, 'User not found')
 class UserAssociatedCountriesList(Resource):
-    @user_ns.doc('get_countries_for_user')
-    @user_ns.marshal_list_with(country_model_output)
-    def get(self, id):
-        """Get all countries associated with a specific user via the User_countries table."""
+    @user_ns.doc('get_user_associated_countries',
+                 description='Retrieves a list of countries associated with the specified user through the User_countries table.')
+    @user_ns.marshal_list_with(associated_country_model)  # Use the new local model
+    def get(self, user_id):  # Parameter name matches the path
+        """Get summarized information for countries associated with a specific user."""
         with get_db() as conn:
-            user = conn.execute('SELECT 1 FROM Users WHERE user_id = ?', (id,)).fetchone()
+            # First, check if the user actually exists
+            user = conn.execute('SELECT 1 FROM Users WHERE user_id = ?', (user_id,)).fetchone()
             if not user:
-                user_ns.abort(404, f"User with ID {id} not found.")
+                user_ns.abort(404, f"User with ID {user_id} not found.")
 
-            countries = conn.execute('''
-                SELECT c.* FROM Countries c
+            # Query for associated countries, selecting only fields in associated_country_model
+            countries_data = conn.execute('''
+                SELECT c.country_id, c.country_code3, c.country -- Add c.flag_url if in model
+                FROM Countries c
                 JOIN User_countries uc ON c.country_id = uc.country_id
                 WHERE uc.user_id = ?
                 ORDER BY c.country ASC
-            ''', (id,)).fetchall()
-        return [dict(row) for row in countries]  # Returns empty list if no associations
+            ''', (user_id,)).fetchall()
+        # Returns an empty list if no countries are associated, which is a valid 200 response.
+        return [dict(row) for row in countries_data]

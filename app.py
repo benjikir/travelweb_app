@@ -1,8 +1,9 @@
 # app.py
 from flask import Flask
 from flask_restx import Api
-from resources import user_ns, country_ns, location_ns, trip_ns, user_country_ns
+from resources import user_ns, location_ns, trip_ns, user_country_ns
 from init_db import create_tables, DATABASE_NAME
+
 import os
 
 app = Flask(__name__)
@@ -10,14 +11,18 @@ app = Flask(__name__)
 
 api = Api(app,
           title="Travel WebApp BACKEND",
-          version="0.2",
+          version="0.1.9",
           description="Showing my API Endpoints with Swagger UI",
-          )
+          ui_params={
+              'defaultModelsExpandDepth': -1,
+          }
+            )
+
+
 
 # Add endpoints
 api.add_namespace(user_ns, path='/Users')
 api.add_namespace(user_country_ns, path='/User-countries-')
-api.add_namespace(country_ns, path='/Countries')
 api.add_namespace(location_ns, path='/Locations')
 api.add_namespace(trip_ns, path='/Trips')
 

@@ -1,4 +1,4 @@
-# resources/countries.py
+#resources/countries.py
 from flask_restx import Namespace, Resource, fields
 from db import get_db
 import sqlite3
@@ -235,3 +235,4 @@ class CountryAssociatedUsersList(Resource):
                 ORDER BY u.username ASC
             ''', (id,)).fetchall()
         return [dict(row) for row in users]
+
