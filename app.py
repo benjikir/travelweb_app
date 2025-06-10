@@ -4,6 +4,7 @@ from flask_restx import Api
 from resources import user_ns, location_ns, trip_ns, user_country_ns
 from init_db import create_tables, DATABASE_NAME
 
+import seed_countries
 import os
 
 app = Flask(__name__)
@@ -11,7 +12,7 @@ app = Flask(__name__)
 
 api = Api(app,
           title="Travel WebApp BACKEND",
-          version="0.1.9",
+          version="0.1.1",
           description="Showing my API Endpoints with Swagger UI",
           ui_params={
               'defaultModelsExpandDepth': -1,

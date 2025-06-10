@@ -57,17 +57,6 @@ class UserCountryLinkList(Resource):
 class SpecificUserCountryLink(Resource):
     @user_country_ns.doc('get_specific_user_country_link')
     @user_country_ns.marshal_with(user_country_link_model)
-    def get(self, user_id, country_id):
-        """Check if a specific link exists between a user and a country."""
-        with get_db() as conn:
-            link = conn.execute(
-                'SELECT user_id, country_id FROM User_countries WHERE user_id = ? AND country_id = ?',
-                (user_id, country_id)
-            ).fetchone()
-        if not link:
-            user_country_ns.abort(404, f"No link found between user {user_id} and country {country_id}.")
-        return dict(link)
-
     @user_country_ns.doc('unlink_user_country')
     @user_country_ns.response(204, 'User successfully unlinked from country.')
     def delete(self, user_id, country_id):

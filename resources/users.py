@@ -139,29 +139,3 @@ class UserResource(Resource):
         return '', 204
 
 
-# --- Nested route for /users/{id}/countries ---
-@user_ns.route('/<int:user_id>/countries')  # Renamed path param to user_id for clarity
-@user_ns.param('user_id', 'The identifier of the User')
-@user_ns.response(404, 'User not found')
-class UserAssociatedCountriesList(Resource):
-    @user_ns.doc('get_user_associated_countries',
-                 description='Retrieves a list of countries associated with the specified user through the User_countries table.')
-    @user_ns.marshal_list_with(associated_country_model)  # Use the new local model
-    def get(self, user_id):  # Parameter name matches the path
-        """Get summarized information for countries associated with a specific user."""
-        with get_db() as conn:
-            # First, check if the user actually exists
-            user = conn.execute('SELECT 1 FROM Users WHERE user_id = ?', (user_id,)).fetchone()
-            if not user:
-                user_ns.abort(404, f"User with ID {user_id} not found.")
-
-            # Query for associated countries, selecting only fields in associated_country_model
-            countries_data = conn.execute('''
-                SELECT c.country_id, c.country_code3, c.country -- Add c.flag_url if in model
-                FROM Countries c
-                JOIN User_countries uc ON c.country_id = uc.country_id
-                WHERE uc.user_id = ?
-                ORDER BY c.country ASC
-            ''', (user_id,)).fetchall()
-        # Returns an empty list if no countries are associated, which is a valid 200 response.
-        return [dict(row) for row in countries_data]

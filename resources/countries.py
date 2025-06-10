@@ -5,8 +5,7 @@ import sqlite3
 import pycountry
 import re
 
-# Import user model for the nested route
-from .users import user_model_output  # Ensure users.py and user_model_output are available
+
 
 country_ns = Namespace('Countries', description='Country related operations')
 
