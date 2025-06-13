@@ -22,10 +22,10 @@ api = Api(app,
 
 
 # Add endpoints
-api.add_namespace(user_ns, path='/Users')
-api.add_namespace(user_country_ns, path='/User-countries-')
-api.add_namespace(location_ns, path='/Locations')
-api.add_namespace(trip_ns, path='/Trips')
+api.add_namespace(user_ns, path='/users')
+api.add_namespace(user_country_ns, path='/user-countries')
+api.add_namespace(location_ns, path='/locations')
+api.add_namespace(trip_ns, path='/trips')
 
 
 if __name__ == '__main__':

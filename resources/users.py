@@ -3,7 +3,7 @@ from flask_restx import Namespace, Resource, fields
 from db import get_db  # Assuming db.py is in the parent directory or project root
 import sqlite3
 
-user_ns = Namespace('Users', description='User administration ')
+user_ns = Namespace('users', description='User administration ')
 
 # --- Main User Models ---
 user_model_input = user_ns.model('UserInput', {
@@ -38,13 +38,6 @@ associated_country_model = user_ns.model('AssociatedCountryInfo', {  # New uniqu
 class UserList(Resource):
     @user_ns.doc('list_users')
     @user_ns.marshal_list_with(user_model_output)
-    def get(self):
-        """List all users, ordered by username."""
-        with get_db() as conn:
-            users = conn.execute(
-                'SELECT user_id, username, email, profile_url, created_at FROM Users ORDER BY username ASC').fetchall()
-        return [dict(row) for row in users]
-
     @user_ns.doc('create_user')
     @user_ns.expect(user_model_input)
     @user_ns.marshal_with(user_model_output, code=201)
