@@ -1,3 +1,4 @@
+
 # resources/locations.py
 from flask_restx import Namespace, Resource, fields
 from db import get_db
@@ -24,15 +25,6 @@ location_model_output = location_ns.model('LocationOutput', {
 
 @location_ns.route('/')
 class LocationList(Resource):
-    # GET method for listing ALL locations has been REMOVED
-    # @location_ns.doc('list_all_locations', description="Retrieve a list of all stored locations.")
-    # @location_ns.marshal_list_with(location_model_output)
-    # def get(self):
-    #     """List all locations."""
-    #     with get_db() as conn:
-    #         locations = conn.execute('SELECT * FROM Locations ORDER BY loc_name ASC').fetchall()
-    #     return [dict(row) for row in locations]
-
     @location_ns.doc('create_location',
                      description="Add a new location. A user cannot add two locations with the same name.")
     @location_ns.expect(location_model_input)
@@ -51,7 +43,6 @@ class LocationList(Resource):
             location_ns.abort(400, "loc_name, user_id, and country_id are required.")
 
         with get_db() as conn:
-            # Validate foreign keys
             user_exists = conn.execute("SELECT 1 FROM Users WHERE user_id = ?", (user_id_input,)).fetchone()
             if not user_exists:
                 location_ns.abort(400, f"User with ID {user_id_input} does not exist.")
@@ -70,7 +61,6 @@ class LocationList(Resource):
                 location_id = cursor.lastrowid
                 conn.commit()
             except sqlite3.IntegrityError as e:
-                # This catches the UNIQUE (user_id, loc_name) constraint
                 if "UNIQUE constraint failed: Locations.user_id, Locations.loc_name" in str(e):
                     location_ns.abort(409,
                                       f"User (ID: {user_id_input}) already has a location named '{loc_name}'. Please choose a different name.")
@@ -84,7 +74,7 @@ class LocationList(Resource):
         return dict(new_location), 201
 
 
-@location_ns.route('/<int:location_id>')  # Using location_id for clarity
+@location_ns.route('/<int:location_id>')
 @location_ns.response(404, 'Location not found for the given ID.')
 @location_ns.param('location_id', 'The unique identifier of the location')
 class LocationResource(Resource):
@@ -160,3 +150,27 @@ class LocationResource(Resource):
             if cursor.rowcount == 0:
                 location_ns.abort(404, f"Location with ID {location_id} not found, cannot delete.")
         return '', 204
+
+
+@location_ns.route('/user/<int:user_id>')
+@location_ns.param('user_id', 'The unique identifier of the user')
+@location_ns.response(404, 'No locations found for the given user ID.')
+class UserLocations(Resource):
+    @location_ns.doc('get_locations_by_user_id', description="Retrieve all locations added by a specific user.")
+    @location_ns.marshal_list_with(location_model_output)
+    def get(self, user_id):
+        """Fetch all locations for a specific user by their user ID."""
+        with get_db() as conn:
+            user_exists = conn.execute("SELECT 1 FROM Users WHERE user_id = ?", (user_id,)).fetchone()
+            if not user_exists:
+                location_ns.abort(404, f"User with ID {user_id} does not exist.")
+
+            locations = conn.execute(
+                'SELECT * FROM Locations WHERE user_id = ? ORDER BY loc_name ASC',
+                (user_id,)
+            ).fetchall()
+
+        if not locations:
+            location_ns.abort(404, f"No locations found for user ID {user_id}.")
+
+        return [dict(loc) for loc in locations]
