@@ -40,6 +40,8 @@ def create_tables():
         user_id INTEGER NOT NULL,
         country_id INTEGER NOT NULL, -- Country still relevant for the location itself
         image_url TEXT,
+        latitude REAL NOT NULL,   -- Added latitude column
+        longitude REAL NOT NULL,  -- Added longitude column
         FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
         FOREIGN KEY (country_id) REFERENCES Countries(country_id) ON DELETE CASCADE,
         UNIQUE (user_id, loc_name) -- Ensures a user cannot have two locations with the same name
