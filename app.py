@@ -3,43 +3,113 @@ from flask import Flask
 from flask_restx import Api
 from resources import user_ns, location_ns, trip_ns, user_country_ns
 from init_db import create_tables, DATABASE_NAME
-
-import seed_countries
 import os
+import sqlite3
+
+# Use absolute path for database
+DATABASE_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'travel_webapp.sqlite')
 
 app = Flask(__name__)
-
 
 api = Api(app,
           title="Travel WebApp BACKEND",
           version="0.1.1",
-          description="Showing my API Endpoints with Swagger UI",
+          description="API for managing travel data including users, locations, trips, and country associations",
           ui_params={
               'defaultModelsExpandDepth': -1,
           }
-            )
+          )
 
-
-
-# Add endpoints
+# Add namespaces with their paths
 api.add_namespace(user_ns, path='/users')
 api.add_namespace(user_country_ns, path='/user-countries')
 api.add_namespace(location_ns, path='/locations')
 api.add_namespace(trip_ns, path='/trips')
 
 
-if __name__ == '__main__':
-    if not os.path.exists(DATABASE_NAME):
-        print(f"WARNING: Database {DATABASE_NAME} not found. Running create_tables().")
-        create_tables()
-        # Consider adding the default user here too if init_db.py might not be run separately
-        # conn = sqlite3.connect(DATABASE_NAME)
-        # cursor = conn.cursor()
-        # try:
-        #     cursor.execute("INSERT OR IGNORE INTO Users (user_id, username, email) VALUES (?, ?, ?)", (1, 'default_user', 'default@example.com'))
-        #     conn.commit()
-        #     print("Default user ensured in Users table from app.py.")
-        # finally:
-        #     if conn: conn.close()
+def ensure_default_data():
+    """Ensure default user, country, and their relationship exist"""
+    with sqlite3.connect(DATABASE_NAME) as conn:
+        cursor = conn.cursor()
 
+        # Check if default user exists
+        cursor.execute("SELECT user_id FROM Users WHERE user_id = 1")
+        if not cursor.fetchone():
+            cursor.execute(
+                "INSERT INTO Users (user_id, username, email) VALUES (?, ?, ?)",
+                (1, 'default_user', 'default@example.com')
+            )
+            print("Created default user with ID 1")
+
+        # Check if default country exists
+        cursor.execute("SELECT country_id FROM Countries WHERE country_id = 1")
+        if not cursor.fetchone():
+            cursor.execute(
+                "INSERT INTO Countries (country_id, country_code3, country) VALUES (?, ?, ?)",
+                (1, 'USA', 'United States')
+            )
+            print("Created default country with ID 1")
+
+        # Check if relationship exists
+        cursor.execute("SELECT 1 FROM User_countries WHERE user_id = 1 AND country_id = 1")
+        if not cursor.fetchone():
+            cursor.execute(
+                "INSERT INTO User_countries (user_id, country_id) VALUES (?, ?)",
+                (1, 1)
+            )
+            print("Created relationship between user 1 and country 1")
+
+        conn.commit()
+
+
+def verify_database_state():
+    """Verify the current state of the database and print useful information"""
+    with sqlite3.connect(DATABASE_NAME) as conn:
+        cursor = conn.cursor()
+
+        # Check Users table
+        cursor.execute("SELECT COUNT(*) FROM Users")
+        user_count = cursor.fetchone()[0]
+        print(f"Users table has {user_count} records")
+
+        # Check Countries table
+        cursor.execute("SELECT COUNT(*) FROM Countries")
+        country_count = cursor.fetchone()[0]
+        print(f"Countries table has {country_count} records")
+
+        # Check User_countries table
+        cursor.execute("SELECT COUNT(*) FROM User_countries")
+        link_count = cursor.fetchone()[0]
+        print(f"User_countries table has {link_count} records")
+
+        # Check specifically for user 1
+        cursor.execute("SELECT COUNT(*) FROM User_countries WHERE user_id = 1")
+        user1_links = cursor.fetchone()[0]
+        print(f"User 1 has {user1_links} country links")
+
+        if user1_links == 0:
+            print("WARNING: User 1 has no country links!")
+            # Try to create one
+            cursor.execute(
+                "INSERT INTO User_countries (user_id, country_id) VALUES (?, ?)",
+                (1, 1)
+            )
+            conn.commit()
+            print("Created a link between user 1 and country 1")
+
+
+if __name__ == '__main__':
+    # Initialize database if it doesn't exist
+    if not os.path.exists(DATABASE_NAME):
+        print(f"Database {DATABASE_NAME} not found. Running create_tables().")
+        create_tables()
+        ensure_default_data()
+    else:
+        # Always ensure default data exists
+        ensure_default_data()
+
+    # Verify database state
+    verify_database_state()
+
+    # Run the application
     app.run(debug=True, port=5001)

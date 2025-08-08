@@ -1,7 +1,8 @@
-
 from flask_restx import Namespace, Resource, fields
 from db import get_db
 import sqlite3
+import pycountry
+import re
 
 user_country_ns = Namespace('user_countries',
                             description='Manage direct associations (links) between users and countries')
@@ -50,19 +51,22 @@ class UserCountryLinkCreate(Resource):
 @user_country_ns.route('/<int:user_id>')
 @user_country_ns.param('user_id', 'The user identifier')
 class UserCountriesByUser(Resource):
-    @user_country_ns.doc('get_countries_for_user',
-                         description='Retrieve all countries linked to a specific user.')
     @user_country_ns.marshal_list_with(user_country_link_model)
     def get(self, user_id):
         """List all countries associated with a specific user."""
         with get_db() as conn:
+            # First check if user exists
+            user = conn.execute('SELECT 1 FROM Users WHERE user_id = ?', (user_id,)).fetchone()
+            if not user:
+                user_country_ns.abort(404, f"User with ID {user_id} not found.")
+
             links = conn.execute(
                 'SELECT user_id, country_id FROM User_countries WHERE user_id = ? ORDER BY country_id',
                 (user_id,)
             ).fetchall()
-        if not links:
-            user_country_ns.abort(404, f"No countries found for user {user_id}.")
-        return [dict(row) for row in links]
+
+            # Return empty list instead of 404 if no countries found
+            return [dict(row) for row in links]
 
 # DELETE: Unlink a specific user from a specific country
 @user_country_ns.route('/<int:user_id>/<int:country_id>')

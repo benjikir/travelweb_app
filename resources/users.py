@@ -1,4 +1,4 @@
-# resources/users.py
+ # resources/users.py
 from flask_restx import Namespace, Resource, fields
 from db import get_db  # Assuming db.py is in the parent directory or project root
 import sqlite3
@@ -10,7 +10,7 @@ user_model_input = user_ns.model('UserInput', {
     'username': fields.String(required=True, description='The username', example='john_doe', min_length=3,
                               max_length=50),
     'email': fields.String(required=True, description='The user email address', example='john.doe@example.com',
-                           pattern="[^@]+@[^@]+\.[^@]+"),
+                           pattern=r"[^@]+@[^@]+\.[^@]+"),
     'profile_url': fields.String(description='URL to the user profile picture (optional)',
                                  example='http://example.com/profile.jpg', max_length=2048)
 })
