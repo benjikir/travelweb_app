@@ -2,7 +2,7 @@
 import sqlite3
 import os
 
-# Database configuration - use absolute path
+# Database configuration - absolute path
 DATABASE_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'travel_webapp.sqlite')
 
 
@@ -51,7 +51,7 @@ def create_tables():
             )
         ''')
 
-        # Create Trips table (fixed)
+        # ✅ Create Trips table with country_id
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Trips (
                 trip_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,15 +59,17 @@ def create_tables():
                 user_id INTEGER NOT NULL,
                 country_id INTEGER NOT NULL,
                 location_id INTEGER,
-                start_date TEXT NOT NULL,
-                end_date TEXT NOT NULL,
+                startdate TEXT NOT NULL,
+                enddate TEXT NOT NULL,
                 notes TEXT,
+                UNIQUE(user_id, trip_name),
                 FOREIGN KEY (user_id) REFERENCES Users(user_id),
+                FOREIGN KEY (country_id) REFERENCES Countries(country_id),
                 FOREIGN KEY (location_id) REFERENCES Locations(location_id)
             )
         ''')
 
-        # Create User_countries table (many-to-many relationship)
+        # Create User_countries table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS User_countries (
                 user_id INTEGER NOT NULL,
@@ -79,7 +81,7 @@ def create_tables():
         ''')
 
         conn.commit()
-        print("All database tables created successfully")
+        print("All database tables created successfully.")
 
 
 def populate_sample_data():
@@ -89,26 +91,30 @@ def populate_sample_data():
     with sqlite3.connect(DATABASE_NAME) as conn:
         cursor = conn.cursor()
 
-        # Insert sample users
+        # Sample user
         cursor.execute(
             "INSERT OR IGNORE INTO Users (user_id, username, email) VALUES (?, ?, ?)",
             (1, 'default_user', 'default@example.com')
         )
 
-        # Insert sample countries
+        # Sample countries
         cursor.execute(
             "INSERT OR IGNORE INTO Countries (country_id, country_code3, country) VALUES (?, ?, ?)",
-            (1, 'USA', 'United States')
+            (1, 'FRA', 'France')
+        )
+        cursor.execute(
+            "INSERT OR IGNORE INTO Countries (country_id, country_code3, country) VALUES (?, ?, ?)",
+            (2, 'USA', 'United States')
         )
 
-        # Link user to country
+        # Link user to a country
         cursor.execute(
             "INSERT OR IGNORE INTO User_countries (user_id, country_id) VALUES (?, ?)",
             (1, 1)
         )
 
         conn.commit()
-        print("Sample data populated successfully")
+        print("Sample data populated successfully.")
 
 
 def initialize_database():
@@ -121,7 +127,7 @@ def initialize_database():
     # Create tables
     create_tables()
 
-    # Populate with sample data
+    # Populate sample data
     populate_sample_data()
 
     print(f"Database initialized successfully: {DATABASE_NAME}")
