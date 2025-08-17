@@ -57,6 +57,7 @@ def create_tables():
                 trip_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 trip_name TEXT NOT NULL,
                 user_id INTEGER NOT NULL,
+                country_id INTEGER NOT NULL,
                 location_id INTEGER,
                 start_date TEXT NOT NULL,
                 end_date TEXT NOT NULL,
