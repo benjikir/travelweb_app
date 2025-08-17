@@ -9,10 +9,7 @@ location_model_input = location_ns.model('LocationInput', {
                               max_length=255),
     'user_id': fields.Integer(required=True, description='ID of the user adding the location', example=1),
     'country_id': fields.Integer(required=True, description='ID of the country where the location is', example=1),
-    'image_url': fields.String(description='Image URL of the location (optional)', max_length=2048),
-    # Add latitude and longitude to the input model
-    'latitude': fields.Float(required=True, description='Latitude of the location', example=48.8584),
-    'longitude': fields.Float(required=True, description='Longitude of the location', example=2.2945)
+    'image_url': fields.String(description='Image URL of the location (optional)', max_length=2048)
 })
 
 location_model_output = location_ns.model('LocationOutput', {
@@ -20,10 +17,7 @@ location_model_output = location_ns.model('LocationOutput', {
     'loc_name': fields.String(description='Name of the location'),
     'user_id': fields.Integer(description='ID of the user who added the location'),
     'country_id': fields.Integer(description='ID of the country where the location is'),
-    'image_url': fields.String(description='Image URL of the location'),
-    # Add latitude and longitude to the output model
-    'latitude': fields.Float(description='Latitude of the location'),
-    'longitude': fields.Float(description='Longitude of the location')
+    'image_url': fields.String(description='Image URL of the location')
 })
 
 
@@ -41,13 +35,10 @@ class LocationList(Resource):
         loc_name = data.get('loc_name', '').strip()
         user_id_input = data.get('user_id')
         country_id_input = data.get('country_id')
-        image_url = data.get('image_url', '').strip() if data.get('image_url') is not None else None
-        # Get latitude and longitude from the payload
-        latitude = data.get('latitude')
-        longitude = data.get('longitude')
+        image_url = data.get('image_url', '').strip() if data.get('image_url') else None
 
-        if not all([loc_name, user_id_input is not None, country_id_input is not None, latitude is not None, longitude is not None]):
-            location_ns.abort(400, "loc_name, user_id, country_id, latitude, and longitude are required.")
+        if not all([loc_name, user_id_input is not None, country_id_input is not None]):
+            location_ns.abort(400, "loc_name, user_id, and country_id are required.")
 
         with get_db() as conn:
             user_exists = conn.execute("SELECT 1 FROM Users WHERE user_id = ?", (user_id_input,)).fetchone()
@@ -61,10 +52,9 @@ class LocationList(Resource):
 
             cursor = conn.cursor()
             try:
-                # Update the INSERT statement to include latitude and longitude
                 cursor.execute(
-                    'INSERT INTO Locations (loc_name, user_id, country_id, image_url, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)',
-                    (loc_name, user_id_input, country_id_input, image_url, latitude, longitude)
+                    'INSERT INTO Locations (loc_name, user_id, country_id, image_url) VALUES (?, ?, ?, ?)',
+                    (loc_name, user_id_input, country_id_input, image_url)
                 )
                 location_id = cursor.lastrowid
                 conn.commit()
@@ -76,7 +66,6 @@ class LocationList(Resource):
                     location_ns.abort(500, f"Database error during location creation: {e}")
 
         with get_db() as conn:
-            # Update the SELECT statement to retrieve latitude and longitude
             new_location = conn.execute('SELECT * FROM Locations WHERE location_id = ?', (location_id,)).fetchone()
         if not new_location:
             location_ns.abort(500, "Internal Server Error: Failed to retrieve location after creation.")
@@ -92,7 +81,6 @@ class LocationResource(Resource):
     def get(self, location_id):
         """Fetch a specific location by its ID."""
         with get_db() as conn:
-            # Update the SELECT statement to retrieve latitude and longitude
             location = conn.execute('SELECT * FROM Locations WHERE location_id = ?', (location_id,)).fetchone()
         if location is None:
             location_ns.abort(404, f"Location with ID {location_id} not found.")
@@ -111,14 +99,10 @@ class LocationResource(Resource):
         loc_name = data.get('loc_name', '').strip()
         user_id_input = data.get('user_id')
         country_id_input = data.get('country_id')
-        image_url = data.get('image_url', '').strip() if data.get('image_url') is not None else None
-        # Get latitude and longitude from the payload for update
-        latitude = data.get('latitude')
-        longitude = data.get('longitude')
+        image_url = data.get('image_url', '').strip() if data.get('image_url') else None
 
-        # Update the validation for required fields
-        if not all([loc_name, user_id_input is not None, country_id_input is not None, latitude is not None, longitude is not None]):
-            location_ns.abort(400, "loc_name, user_id, country_id, latitude, and longitude are required for update.")
+        if not all([loc_name, user_id_input is not None, country_id_input is not None]):
+            location_ns.abort(400, "loc_name, user_id, and country_id are required for update.")
 
         with get_db() as conn:
             current_location = conn.execute('SELECT user_id FROM Locations WHERE location_id = ?',
@@ -135,11 +119,10 @@ class LocationResource(Resource):
                 location_ns.abort(400, f"Country with ID {country_id_input} (for update) does not exist.")
 
             try:
-                # Update the UPDATE statement to include latitude and longitude
                 conn.execute(
-                    '''UPDATE Locations SET loc_name = ?, user_id = ?, country_id = ?, image_url = ?, latitude = ?, longitude = ?
+                    '''UPDATE Locations SET loc_name = ?, user_id = ?, country_id = ?, image_url = ?
                        WHERE location_id = ?''',
-                    (loc_name, user_id_input, country_id_input, image_url, latitude, longitude, location_id)
+                    (loc_name, user_id_input, country_id_input, image_url, location_id)
                 )
                 conn.commit()
             except sqlite3.IntegrityError as e:
@@ -149,7 +132,6 @@ class LocationResource(Resource):
                 else:
                     location_ns.abort(500, f"Database error during location update: {e}")
 
-            # Update the SELECT statement to retrieve latitude and longitude
             updated_location = conn.execute('SELECT * FROM Locations WHERE location_id = ?', (location_id,)).fetchone()
         if not updated_location:
             location_ns.abort(404, f"Location with ID {location_id} could not be retrieved after update attempt.")
@@ -181,7 +163,6 @@ class UserLocations(Resource):
             if not user_exists:
                 location_ns.abort(404, f"User with ID {user_id} does not exist.")
 
-            # Update the SELECT statement to retrieve latitude and longitude
             locations = conn.execute(
                 'SELECT * FROM Locations WHERE user_id = ? ORDER BY loc_name ASC',
                 (user_id,)

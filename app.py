@@ -3,6 +3,7 @@ from flask import Flask
 from flask_restx import Api
 from resources import user_ns, location_ns, trip_ns, user_country_ns
 from init_db import create_tables, DATABASE_NAME
+from flask_cors import CORS
 import os
 import sqlite3
 
@@ -10,6 +11,7 @@ import sqlite3
 DATABASE_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'travel_webapp.sqlite')
 
 app = Flask(__name__)
+CORS(app, resources={r'/*' : {'origins': '*'}})
 
 api = Api(app,
           title="Travel WebApp BACKEND",
@@ -100,6 +102,8 @@ def verify_database_state():
 
 if __name__ == '__main__':
     # Initialize database if it doesn't exist
+    port = int(os.environ.get("PORT", 5001))
+
     if not os.path.exists(DATABASE_NAME):
         print(f"Database {DATABASE_NAME} not found. Running create_tables().")
         create_tables()
@@ -112,4 +116,4 @@ if __name__ == '__main__':
     verify_database_state()
 
     # Run the application
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=port, host='0.0.0.0')
