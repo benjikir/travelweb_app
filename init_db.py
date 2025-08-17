@@ -37,12 +37,16 @@ def create_tables():
             )
         ''')
 
-        # Create Locations table (without latitude and longitude)
+        # ✅ Create Locations table (matching your Flask API code)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Locations (
                 location_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                location_name TEXT NOT NULL,
+                loc_name TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
                 country_id INTEGER NOT NULL,
+                image_url TEXT,
+                UNIQUE(user_id, loc_name),
+                FOREIGN KEY (user_id) REFERENCES Users(user_id),
                 FOREIGN KEY (country_id) REFERENCES Countries(country_id)
             )
         ''')
