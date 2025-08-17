@@ -20,5 +20,4 @@ sql==2022.4.0
 SQLAlchemy==2.0.41
 typing_extensions==4.14.0
 Werkzeug==3.1.3
-flask-cors
-gunicorn
+flask-cors==4.0.0
