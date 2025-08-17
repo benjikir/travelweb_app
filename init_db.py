@@ -37,7 +37,7 @@ def create_tables():
             )
         ''')
 
-        # ✅ Create Locations table (matching your Flask API code)
+        # Create Locations table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Locations (
                 location_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,12 +51,13 @@ def create_tables():
             )
         ''')
 
-        # Create Trips table
+        # Create Trips table (fixed)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Trips (
                 trip_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trip_name TEXT NOT NULL,
                 user_id INTEGER NOT NULL,
-                location_id INTEGER NOT NULL,
+                location_id INTEGER,
                 start_date TEXT NOT NULL,
                 end_date TEXT NOT NULL,
                 notes TEXT,
