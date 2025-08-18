@@ -1,3 +1,4 @@
+# resources/locations.py
 from flask_restx import Namespace, Resource, fields
 from db import get_db
 import sqlite3
@@ -23,6 +24,14 @@ location_model_output = location_ns.model('LocationOutput', {
 
 @location_ns.route('/')
 class LocationList(Resource):
+    @location_ns.doc('list_all_locations')
+    @location_ns.marshal_list_with(location_model_output)
+    def get(self): # This method now lists ALL locations
+        """List all locations."""
+        with get_db() as conn:
+            locations = conn.execute('SELECT * FROM Locations').fetchall()
+        return [dict(location) for location in locations]
+
     @location_ns.doc('create_location',
                      description="Add a new location. A user cannot add two locations with the same name.")
     @location_ns.expect(location_model_input)
@@ -139,6 +148,7 @@ class LocationResource(Resource):
 
     @location_ns.doc('delete_location_by_id', description="Delete a location by its unique ID.")
     @location_ns.response(204, 'Location deleted successfully.')
+    @location_ns.response(404, 'Location not found.')
     def delete(self, location_id):
         """Delete a location by its ID."""
         with get_db() as conn:
@@ -149,26 +159,5 @@ class LocationResource(Resource):
                 location_ns.abort(404, f"Location with ID {location_id} not found, cannot delete.")
         return '', 204
 
-
-@location_ns.route('/user/<int:user_id>')
-@location_ns.param('user_id', 'The unique identifier of the user')
-@location_ns.response(404, 'No locations found for the given user ID.')
-class UserLocations(Resource):
-    @location_ns.doc('get_locations_by_user_id', description="Retrieve all locations added by a specific user.")
-    @location_ns.marshal_list_with(location_model_output)
-    def get(self, user_id):
-        """Fetch all locations for a specific user by their user ID."""
-        with get_db() as conn:
-            user_exists = conn.execute("SELECT 1 FROM Users WHERE user_id = ?", (user_id,)).fetchone()
-            if not user_exists:
-                location_ns.abort(404, f"User with ID {user_id} does not exist.")
-
-            locations = conn.execute(
-                'SELECT * FROM Locations WHERE user_id = ? ORDER BY loc_name ASC',
-                (user_id,)
-            ).fetchall()
-
-        if not locations:
-            location_ns.abort(404, f"No locations found for user ID {user_id}.")
-
-        return [dict(loc) for loc in locations]
+# Removed the UserLocations class and its route /user/<int:user_id>
+# This endpoint is no longer supported directly.

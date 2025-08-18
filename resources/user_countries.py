@@ -1,3 +1,4 @@
+# resources/user_countries.py
 from flask_restx import Namespace, Resource, fields
 from db import get_db
 import sqlite3
@@ -50,6 +51,7 @@ class UserCountryLinkCreate(Resource):
 # GET: All countries for a specific user
 @user_country_ns.route('/<int:user_id>')
 @user_country_ns.param('user_id', 'The user identifier')
+@user_country_ns.response(404, 'User not found.') # Changed message to reflect user not found
 class UserCountriesByUser(Resource):
     @user_country_ns.marshal_list_with(user_country_link_model)
     def get(self, user_id):
@@ -65,7 +67,7 @@ class UserCountriesByUser(Resource):
                 (user_id,)
             ).fetchall()
 
-            # Return empty list instead of 404 if no countries found
+            # Return empty list if no countries found for the user, as per typical REST list endpoints
             return [dict(row) for row in links]
 
 # DELETE: Unlink a specific user from a specific country
