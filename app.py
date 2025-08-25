@@ -1,8 +1,11 @@
-# app.py
 from flask import Flask
 from flask_restx import Api
-from resources import user_ns, location_ns, trip_ns, user_country_ns
-from init_db import create_tables, DATABASE_NAME
+from resources import user_ns
+from resources import location_ns
+from resources import trip_ns
+from resources import user_country_ns
+from resources import country_ns
+from init_db import create_tables
 from flask_cors import CORS
 import os
 import sqlite3
@@ -27,6 +30,7 @@ api.add_namespace(user_ns, path='/users')
 api.add_namespace(user_country_ns, path='/user-countries')
 api.add_namespace(location_ns, path='/locations')
 api.add_namespace(trip_ns, path='/trips')
+api.add_namespace(country_ns, path='/countries')
 
 
 def ensure_default_data():
@@ -47,7 +51,7 @@ def ensure_default_data():
         cursor.execute("SELECT country_id FROM Countries WHERE country_id = 1")
         if not cursor.fetchone():
             cursor.execute(
-                "INSERT INTO Countries (country_id, country_code3, country) VALUES (?, ?, ?)",
+                "INSERT OR IGNORE INTO Countries (country_id, country_code3, country) VALUES (?, ?, ?)",
                 (1, 'USA', 'United States')
             )
             print("Created default country with ID 1")
@@ -93,7 +97,7 @@ def verify_database_state():
             print("WARNING: User 1 has no country links!")
             # Try to create one
             cursor.execute(
-                "INSERT INTO User_countries (user_id, country_id) VALUES (?, ?)",
+                "INSERT OR IGNORE INTO User_countries (user_id, country_id) VALUES (?, ?)",
                 (1, 1)
             )
             conn.commit()

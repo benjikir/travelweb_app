@@ -1,11 +1,11 @@
-#resources/countries.py
 from flask_restx import Namespace, Resource, fields
 from db import get_db
 import sqlite3
 import pycountry
 import re
 
-
+# Assuming you might need user_model_output for one of the endpoints
+from .users import user_model_output
 
 country_ns = Namespace('Countries', description='Country related operations')
 
@@ -58,14 +58,14 @@ country_model_output = country_ns.model('CountryOutput', {
 
 @country_ns.route('/')
 class CountryList(Resource):
-    # GET for listing all countries (if you want it, otherwise keep commented)
-    # @country_ns.doc('list_countries')
-    # @country_ns.marshal_list_with(country_model_output)
-    # def get(self):
-    #     """List all countries"""
-    #     with get_db() as conn:
-    #         countries = conn.execute('SELECT * FROM Countries ORDER BY country ASC').fetchall()
-    #     return [dict(row) for row in countries]
+    # CHANGED: The following GET method has been uncommented to handle GET requests to /countries
+    @country_ns.doc('list_countries')
+    @country_ns.marshal_list_with(country_model_output)
+    def get(self):
+        """List all countries"""
+        with get_db() as conn:
+            countries = conn.execute('SELECT * FROM Countries ORDER BY country ASC').fetchall()
+        return [dict(row) for row in countries]
 
     @country_ns.doc('create_country')
     @country_ns.expect(country_model_input)
@@ -128,16 +128,15 @@ class CountryList(Resource):
 @country_ns.response(404, 'Country not found')
 @country_ns.param('id', 'The country identifier')
 class CountryResource(Resource):
-    # GET for a single country (if you want it, otherwise keep commented)
-    # @country_ns.doc('get_country')
-    # @country_ns.marshal_with(country_model_output)
-    # def get(self, id):
-    #     """Fetch a specific country by its ID"""
-    #     with get_db() as conn:
-    #         country = conn.execute('SELECT * FROM Countries WHERE country_id = ?', (id,)).fetchone()
-    #     if country is None:
-    #         country_ns.abort(404, f"Country with ID {id} not found.")
-    #     return dict(country)
+    @country_ns.doc('get_country')
+    @country_ns.marshal_with(country_model_output)
+    def get(self, id):
+        """Fetch a specific country by its ID"""
+        with get_db() as conn:
+            country = conn.execute('SELECT * FROM Countries WHERE country_id = ?', (id,)).fetchone()
+        if country is None:
+            country_ns.abort(404, f"Country with ID {id} not found.")
+        return dict(country)
 
     @country_ns.doc('update_country')
     @country_ns.expect(country_model_input)
@@ -234,4 +233,3 @@ class CountryAssociatedUsersList(Resource):
                 ORDER BY u.username ASC
             ''', (id,)).fetchall()
         return [dict(row) for row in users]
-
