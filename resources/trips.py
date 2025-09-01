@@ -82,7 +82,8 @@ class TripList(Resource):
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    'INSERT INTO Trips (trip_name, user_id, country_id, startdate, enddate) VALUES (?, ?, ?, ?, ?)',
+                    'INSERT INTO Trips (trip_name, user_id, country_id, start_date, end_date) VALUES (?, ?, ?, ?, ?)',
+                    # Spaltennamen mit Unterstrich
                     (trip_name, user_id_input, country_id_input, start_date, end_date)
                 )
                 trip_id = cursor.lastrowid
