@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_restx import Api
 from resources import user_ns
 from resources import location_ns
@@ -14,7 +14,7 @@ import sqlite3
 DATABASE_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'travel_webapp.sqlite')
 
 app = Flask(__name__)
-CORS(app, resources={r'/*' : {'origins': '*'}})
+CORS(app, resources={r'/*': {'origins': '*'}})
 
 api = Api(app,
           title="Travel WebApp BACKEND",
@@ -31,6 +31,53 @@ api.add_namespace(user_country_ns, path='/user-countries')
 api.add_namespace(location_ns, path='/locations')
 api.add_namespace(trip_ns, path='/trips')
 api.add_namespace(country_ns, path='/countries')
+
+
+# ✅ NEUE ROUTE: GeoJSON für Country-Highlighting bereitstellen
+@app.route('/countries.geojson')
+def serve_countries_geojson():
+    """Serve the countries GeoJSON file for map highlighting"""
+    try:
+        return send_from_directory(
+            'static',
+            'countries.geojson',
+            mimetype='application/json'
+        )
+    except FileNotFoundError:
+        return {"error": "countries.geojson not found. Please add the file to the static folder."}, 404
+
+
+# ✅ NEUE ROUTE: Generelle statische Dateien (optional, für bessere Flexibilität)
+@app.route('/static/<path:filename>')
+def serve_static_files(filename):
+    """Serve static files from the static directory"""
+    try:
+        return send_from_directory('static', filename)
+    except FileNotFoundError:
+        return {"error": f"File {filename} not found"}, 404
+
+
+# ✅ NEUE ROUTE: Root-Route für API-Info (optional)
+@app.route('/')
+def api_info():
+    """Basic API information"""
+    return {
+        "message": "Travel WebApp API",
+        "version": "0.1.1",
+        "status": "running",
+        "endpoints": {
+            "swagger_ui": "/",
+            "countries_geojson": "/countries.geojson",
+            "static_files": "/static/<filename>",
+            "api_endpoints": [
+                "/users",
+                "/locations",
+                "/trips",
+                "/countries",
+                "/user-countries"
+            ]
+        }
+    }
 
 
 def ensure_default_data():
@@ -104,6 +151,24 @@ def verify_database_state():
             print("Created a link between user 1 and country 1")
 
 
+def check_static_folder():
+    """Check if static folder exists and contains countries.geojson"""
+    static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+    geojson_file = os.path.join(static_folder, 'countries.geojson')
+
+    if not os.path.exists(static_folder):
+        os.makedirs(static_folder)
+        print(f"Created static folder: {static_folder}")
+
+    if not os.path.exists(geojson_file):
+        print(f"WARNING: countries.geojson not found in {static_folder}")
+        print("Please download a GeoJSON file with country boundaries and place it there.")
+        print(
+            "Example: curl -o static/countries.geojson https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson")
+    else:
+        print(f"✅ countries.geojson found in static folder")
+
+
 if __name__ == '__main__':
     # Initialize database if it doesn't exist
     port = int(os.environ.get("PORT", 5001))
@@ -118,6 +183,13 @@ if __name__ == '__main__':
 
     # Verify database state
     verify_database_state()
+
+    # Check static folder and GeoJSON file
+    check_static_folder()
+
+    print(f"Starting Flask app on port {port}")
+    print(f"API Documentation available at: http://localhost:{port}/")
+    print(f"Countries GeoJSON available at: http://localhost:{port}/countries.geojson")
 
     # Run the application
     app.run(debug=True, port=port, host='0.0.0.0')
