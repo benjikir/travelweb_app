@@ -1,195 +1,176 @@
-from flask import Flask, send_from_directory
-from flask_restx import Api
-from resources import user_ns
-from resources import location_ns
-from resources import trip_ns
-from resources import user_country_ns
-from resources import country_ns
-from init_db import create_tables
-from flask_cors import CORS
-import os
+# init_db.py
 import sqlite3
+import os
+import json
 
-# Use absolute path for database
-DATABASE_NAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'travel_webapp.sqlite')
-
-app = Flask(__name__)
-CORS(app, resources={r'/*': {'origins': '*'}})
-
-api = Api(app,
-          title="Travel WebApp BACKEND",
-          version="0.1.1",
-          description="API for managing travel data including users, locations, trips, and country associations",
-          ui_params={
-              'defaultModelsExpandDepth': -1,
-          }
-          )
-
-# Add namespaces with their paths
-api.add_namespace(user_ns, path='/users')
-api.add_namespace(user_country_ns, path='/user-countries')
-api.add_namespace(location_ns, path='/locations')
-api.add_namespace(trip_ns, path='/trips')
-api.add_namespace(country_ns, path='/countries')
+# Database configuration - absolute path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE_NAME = os.path.join(BASE_DIR, 'travel_webapp.sqlite')
+COUNTRIES_JSON = os.path.join(BASE_DIR, 'countries_data.json')
 
 
-# ✅ NEUE ROUTE: GeoJSON für Country-Highlighting bereitstellen
-@app.route('/countries.geojson')
-def serve_countries_geojson():
-    """Serve the countries GeoJSON file for map highlighting"""
-    try:
-        return send_from_directory(
-            'static',
-            'countries.geojson',
-            mimetype='application/json'
-        )
-    except FileNotFoundError:
-        return {"error": "countries.geojson not found. Please add the file to the static folder."}, 404
+def create_tables():
+    """Create all necessary tables for the travel application"""
+    print(f"Creating database tables in {DATABASE_NAME}...")
 
-
-# ✅ NEUE ROUTE: Generelle statische Dateien (optional, für bessere Flexibilität)
-@app.route('/static/<path:filename>')
-def serve_static_files(filename):
-    """Serve static files from the static directory"""
-    try:
-        return send_from_directory('static', filename)
-    except FileNotFoundError:
-        return {"error": f"File {filename} not found"}, 404
-
-
-# ✅ NEUE ROUTE: Root-Route für API-Info (optional)
-@app.route('/')
-def api_info():
-    """Basic API information"""
-    return {
-        "message": "Travel WebApp API",
-        "version": "0.1.1",
-        "status": "running",
-        "endpoints": {
-            "swagger_ui": "/",
-            "countries_geojson": "/countries.geojson",
-            "static_files": "/static/<filename>",
-            "api_endpoints": [
-                "/users",
-                "/locations",
-                "/trips",
-                "/countries",
-                "/user-countries"
-            ]
-        }
-    }
-
-
-def ensure_default_data():
-    """Ensure default user, country, and their relationship exist"""
     with sqlite3.connect(DATABASE_NAME) as conn:
         cursor = conn.cursor()
 
-        # Check if default user exists
-        cursor.execute("SELECT user_id FROM Users WHERE user_id = 1")
-        if not cursor.fetchone():
-            cursor.execute(
-                "INSERT INTO Users (user_id, username, email) VALUES (?, ?, ?)",
-                (1, 'default_user', 'default@example.com')
+        # Create Users table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Users (
+                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                email TEXT NOT NULL UNIQUE,
+                profile_url TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-            print("Created default user with ID 1")
+        ''')
 
-        # Check if default country exists
-        cursor.execute("SELECT country_id FROM Countries WHERE country_id = 1")
-        if not cursor.fetchone():
-            cursor.execute(
-                "INSERT OR IGNORE INTO Countries (country_id, country_code3, country) VALUES (?, ?, ?)",
-                (1, 'USA', 'United States')
+        # Create Countries table
+        # Erweiterung: country_code2 (ISO2, UNIQUE, NOT NULL) für zuverlässiges Mapping/Highlighting
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Countries (
+                country_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                country_code2 TEXT NOT NULL UNIQUE,  -- ISO2 (A2), z. B. "DE"
+                country_code3 TEXT,                  -- ISO3 (A3), optional
+                country TEXT NOT NULL UNIQUE,        -- Ländername (Englisch)
+                flag_url TEXT,
+                currency TEXT,
+                continent TEXT,
+                capital TEXT
             )
-            print("Created default country with ID 1")
+        ''')
+        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_countries_code2 ON Countries(country_code2)')
+        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_countries_name ON Countries(country)')
 
-        # Check if relationship exists
-        cursor.execute("SELECT 1 FROM User_countries WHERE user_id = 1 AND country_id = 1")
-        if not cursor.fetchone():
-            cursor.execute(
-                "INSERT INTO User_countries (user_id, country_id) VALUES (?, ?)",
-                (1, 1)
+        # Create Locations table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Locations (
+                location_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                loc_name TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
+                country_id INTEGER NOT NULL,
+                image_url TEXT,
+                UNIQUE(user_id, loc_name),
+                FOREIGN KEY (user_id) REFERENCES Users(user_id),
+                FOREIGN KEY (country_id) REFERENCES Countries(country_id)
             )
-            print("Created relationship between user 1 and country 1")
+        ''')
+
+        # Create Trips table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Trips (
+                trip_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trip_name TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
+                country_id INTEGER NOT NULL,
+                location_id INTEGER,
+                startdate TEXT NOT NULL,
+                enddate TEXT NOT NULL,
+                notes TEXT,
+                UNIQUE(user_id, trip_name),
+                FOREIGN KEY (user_id) REFERENCES Users(user_id),
+                FOREIGN KEY (country_id) REFERENCES Countries(country_id),
+                FOREIGN KEY (location_id) REFERENCES Locations(location_id)
+            )
+        ''')
+
+        # Create User_countries table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS User_countries (
+                user_id INTEGER NOT NULL,
+                country_id INTEGER NOT NULL,
+                PRIMARY KEY (user_id, country_id),
+                FOREIGN KEY (user_id) REFERENCES Users(user_id),
+                FOREIGN KEY (country_id) REFERENCES Countries(country_id)
+            )
+        ''')
 
         conn.commit()
+        print("All database tables created successfully.")
 
 
-def verify_database_state():
-    """Verify the current state of the database and print useful information"""
+def populate_countries_from_json(cursor):
+    """Populate Countries from countries_data.json (expects ISO2 codes)"""
+    try:
+        with open(COUNTRIES_JSON, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        countries = data.get('countries', {}).get('country', [])
+        print(f"Found {len(countries)} countries in JSON.")
+    except Exception as e:
+        print("Failed to read countries_data.json:", e)
+        countries = []
+
+    inserted = 0
+    for c in countries:
+        code2 = (c.get('countryCode') or '').strip().upper()
+        name = (c.get('countryName') or '').strip()
+        currency = (c.get('currencyCode') or None)
+        capital = (c.get('capital') or None)
+        continent = (c.get('continentName') or None)
+
+        if not code2 or not name:
+            continue
+
+        # ISO3 liegt in der JSON nicht zuverlässig vor; ggf. NULL lassen oder später anreichern
+        cursor.execute('''
+            INSERT OR IGNORE INTO Countries (country_code2, country_code3, country, currency, continent, capital)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (code2, None, name, currency, continent, capital))
+        inserted += cursor.rowcount
+
+    print(f"Inserted/ignored {inserted} country rows from JSON.")
+
+
+def populate_sample_data():
+    """Populate the database with sample data for testing"""
+    print("Populating database with sample data...")
+
     with sqlite3.connect(DATABASE_NAME) as conn:
         cursor = conn.cursor()
 
-        # Check Users table
-        cursor.execute("SELECT COUNT(*) FROM Users")
-        user_count = cursor.fetchone()[0]
-        print(f"Users table has {user_count} records")
+        # Sample user
+        cursor.execute(
+            "INSERT OR IGNORE INTO Users (user_id, username, email) VALUES (?, ?, ?)",
+            (1, 'default_user', 'default@example.com')
+        )
 
-        # Check Countries table
-        cursor.execute("SELECT COUNT(*) FROM Countries")
-        country_count = cursor.fetchone()[0]
-        print(f"Countries table has {country_count} records")
+        # Full countries list from JSON
+        populate_countries_from_json(cursor)
 
-        # Check User_countries table
-        cursor.execute("SELECT COUNT(*) FROM User_countries")
-        link_count = cursor.fetchone()[0]
-        print(f"User_countries table has {link_count} records")
+        # Ensure a couple of rows exist for safety if JSON missing
+        cursor.execute("INSERT OR IGNORE INTO Countries (country_code2, country) VALUES (?, ?)", ('FR', 'France'))
+        cursor.execute("INSERT OR IGNORE INTO Countries (country_code2, country) VALUES (?, ?)", ('US', 'United States'))
 
-        # Check specifically for user 1
-        cursor.execute("SELECT COUNT(*) FROM User_countries WHERE user_id = 1")
-        user1_links = cursor.fetchone()[0]
-        print(f"User 1 has {user1_links} country links")
-
-        if user1_links == 0:
-            print("WARNING: User 1 has no country links!")
-            # Try to create one
+        # Link user to a known country (France) if present
+        cursor.execute("SELECT country_id FROM Countries WHERE country_code2 = 'FR'")
+        row = cursor.fetchone()
+        if row:
             cursor.execute(
                 "INSERT OR IGNORE INTO User_countries (user_id, country_id) VALUES (?, ?)",
-                (1, 1)
+                (1, row)
             )
-            conn.commit()
-            print("Created a link between user 1 and country 1")
+
+        conn.commit()
+        print("Sample data populated successfully.")
 
 
-def check_static_folder():
-    """Check if static folder exists and contains countries.geojson"""
-    static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
-    geojson_file = os.path.join(static_folder, 'countries.geojson')
+def initialize_database():
+    """Initialize the database with tables and sample data"""
+    # Remove existing database file if it exists
+    if os.path.exists(DATABASE_NAME):
+        os.remove(DATABASE_NAME)
+        print(f"Removed existing database: {DATABASE_NAME}")
 
-    if not os.path.exists(static_folder):
-        os.makedirs(static_folder)
-        print(f"Created static folder: {static_folder}")
+    # Create tables
+    create_tables()
 
-    if not os.path.exists(geojson_file):
-        print(f"WARNING: countries.geojson not found in {static_folder}")
-        print("Please download a GeoJSON file with country boundaries and place it there.")
-        print(
-            "Example: curl -o static/countries.geojson https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson")
-    else:
-        print(f"✅ countries.geojson found in static folder")
+    # Populate sample data
+    populate_sample_data()
+
+    print(f"Database initialized successfully: {DATABASE_NAME}")
 
 
 if __name__ == '__main__':
-    # Initialize database if it doesn't exist
-    port = int(os.environ.get("PORT", 5001))
-
-    if not os.path.exists(DATABASE_NAME):
-        print(f"Database {DATABASE_NAME} not found. Running create_tables().")
-        create_tables()
-        ensure_default_data()
-    else:
-        # Always ensure default data exists
-        ensure_default_data()
-
-    # Verify database state
-    verify_database_state()
-
-    # Check static folder and GeoJSON file
-    check_static_folder()
-
-    print(f"Starting Flask app on port {port}")
-    print(f"API Documentation available at: http://localhost:{port}/")
-    print(f"Countries GeoJSON available at: http://localhost:{port}/countries.geojson")
-
-    # Run the application
-    app.run(debug=True, port=port, host='0.0.0.0')
+    initialize_database()
